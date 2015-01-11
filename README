@@ -17,7 +17,9 @@ Check out http://mattzz.no-ip.org/wiki/Projects/YetAnotherYUVviewer
 usage:
 ------
 
-yay [-s <width>x<height>] [-f format] filename.yuv
+yay [-s <width>x<height>] [-f format] [-p] filename.yuv
+
+Specify '-p' to enable semi-planar mode.
 
 formats: 
  0: Y only 
