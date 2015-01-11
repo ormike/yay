@@ -12,6 +12,7 @@ width and height.
 Optionally you can provide width and height parameters via "-s
 <width>x<height>" paramter.
 
+Check out http://mattzz.no-ip.org/wiki/Projects/YetAnotherYUVviewer
 
 usage:
 ------
