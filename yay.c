@@ -34,8 +34,8 @@
 #include <string.h>
 #include "regex.h"
 
-#include "SDL.h"
-//#include <SDL/SDL.h>
+//#include "SDL.h"
+#include <SDL/SDL.h>
 
 SDL_Surface     *screen;
 SDL_Event       event;
@@ -45,6 +45,8 @@ const SDL_VideoInfo* info = NULL;
 
 Uint32 width = 0;
 Uint32 height = 0;
+Uint32 win_width = 0;
+Uint32 win_height = 0;
 char *vfilename; 
 FILE *fpointer;
 Uint8 *y_data, *cr_data, *cb_data, *tmp_data;
@@ -127,75 +129,78 @@ int load_frame(){
 void convert_chroma_to_420()
 {
   int i, j;
-  //printf("%dx%d\n",width, height);
-  if (cfidc >0)
-    {
-      for(j=0; j<height/2; j++)
-	for(i=0; i<width/2; i++)
-	  {
-	    my_overlay->pixels[1][j*my_overlay->pitches[1]+i] = cr_data[i*MbWidthC[cfidc]/8+j*(width/SubWidthC[cfidc])*MbHeightC[cfidc]/8];
-	    my_overlay->pixels[2][j*my_overlay->pitches[2]+i] = cb_data[i*MbWidthC[cfidc]/8+j*(width/SubWidthC[cfidc])*MbHeightC[cfidc]/8];
-	  }
-    }
-  else
-    {
-      for (i = 0; i < height/2; i++)
-	{
-	  memset(my_overlay->pixels[1]+i*my_overlay->pitches[1], 128, width/2); 
-	  memset(my_overlay->pixels[2]+i*my_overlay->pitches[2], 128, width/2); 
-	}
+  Uint16 xoff = (width - win_width) / 4;
+  Uint16 yoff = (height - win_height) / 4;
 
+  //printf("%dx%d\n",width, height);
+  if (cfidc > 0) {
+    for (j = 0; j < win_height / 2; j++)
+      for (i = 0; i < win_width / 2; i++) {
+        my_overlay->pixels[1][j * my_overlay->pitches[1] + i] =
+            cr_data[(i + xoff) * MbWidthC[cfidc] / 8
+            + (j + yoff) * (width / SubWidthC[cfidc]) * MbHeightC[cfidc] / 8];
+        my_overlay->pixels[2][j * my_overlay->pitches[2] + i] =
+            cb_data[(i + xoff) * MbWidthC[cfidc] / 8
+            + (j + yoff) * (width / SubWidthC[cfidc]) * MbHeightC[cfidc] / 8];
+      }
+  } else {
+    for (i = 0; i < height / 2; i++) {
+      memset(my_overlay->pixels[1] + i * my_overlay->pitches[1], 128, width / 2);
+      memset(my_overlay->pixels[2] + i * my_overlay->pitches[2], 128, width / 2);
     }
+  }
 }
 
 void draw_frame(){ 
   Sint16 x, y;
   Uint16 i;
+  Uint16 xoff = (width - win_width) / 2;
+  Uint16 yoff = (height - win_height) / 2;
+  Uint8 *y_ptr = y_data, *cr_ptr = cr_data, *cb_ptr = cb_data;
+
+  y_ptr += yoff * width;
+  cr_ptr += yoff / 2 * width / 2;
+  cb_ptr += yoff / 2 * width / 2;
   
   /* Fill in pixel data - the pitches array contains the length of a line in each plane*/
   SDL_LockYUVOverlay(my_overlay);
   
-  // we cannot be sure, that buffers are contiguous in memory
-  if (width != my_overlay->pitches[0]) {
-    for (i = 0; i < height; i++) {
-      memcpy(my_overlay->pixels[0]+i*my_overlay->pitches[0], y_data+i*width, width); 
-    }
-  } else {
-    memcpy(my_overlay->pixels[0], y_data, width*height);
+  for (i = 0; i < win_height; i++) {
+    memcpy(my_overlay->pixels[0]+i*my_overlay->pitches[0], y_ptr + xoff, win_width);
+    y_ptr += width;
   }
 
-  if (cfidc == 1)
-    {
-      if (width != my_overlay->pitches[1]) {
-	for (i = 0; i < height/2; i++) {
-	  memcpy(my_overlay->pixels[1]+i*my_overlay->pitches[1], cr_data+i*width/2, width/2); 
-	}
-      } else {
-	memcpy(my_overlay->pixels[1], cr_data, width*height/4);
-      }
+  if (cfidc == 1) {
 
-      if (width != my_overlay->pitches[2]) {
-	for (i = 0; i < height/2; i++) {
-	  memcpy(my_overlay->pixels[2]+i*my_overlay->pitches[2], cb_data+i*width/2, width/2); 
-	}
-      } else {
-	memcpy(my_overlay->pixels[2], cb_data, width*height/4);
-      }
+    for (i = 0; i < win_height / 2; i++) {
+      memcpy(my_overlay->pixels[1] + i * my_overlay->pitches[1],
+          cr_ptr + xoff / 2, win_width / 2);
+      cr_ptr += width / 2;
     }
-  convert_chroma_to_420();
+
+    for (i = 0; i < win_height / 2; i++) {
+      memcpy(my_overlay->pixels[2] + i * my_overlay->pitches[2],
+          cb_ptr + xoff / 2, win_width / 2);
+      cb_ptr += width / 2;
+    }
+  }
+  else
+  {
+    convert_chroma_to_420();
+  }
 
   if(grid){
    
     // horizontal grid lines
-    for(y=0; y<height; y=y+16){
-      for(x=0; x<width; x+=8){
+    for(y=0; y<win_height; y=y+16){
+      for(x=0; x<win_width; x+=8){
 	*(my_overlay->pixels[0] + y   * my_overlay->pitches[0] + x  ) = 0xF0;
 	*(my_overlay->pixels[0] + y   * my_overlay->pitches[0] + x+4  ) = 0x20;
       }
     }
     // vertical grid lines
-    for(x=0; x<width; x=x+16){
-      for(y=0; y<height; y+=8){
+    for(x=0; x<win_width; x=x+16){
+      for(y=0; y<win_height; y+=8){
 	*(my_overlay->pixels[0] + y   * my_overlay->pitches[0] + x  ) = 0xF0;
 	*(my_overlay->pixels[0] + (y+4)   * my_overlay->pitches[0] + x  ) = 0x20;
       }
@@ -206,14 +211,18 @@ void draw_frame(){
 
   video_rect.x = 0;
   video_rect.y = 0;
-  video_rect.w = width*zoom;
-  video_rect.h = height*zoom;
+  video_rect.w = win_width*zoom;
+  video_rect.h = win_height*zoom;
 
   SDL_DisplayYUVOverlay(my_overlay, &video_rect);
 }
 
 void print_usage(){
-  fprintf(stdout, "Usage: yay [-s <widht>x<heigh>] [-f format] [-p] filename.yuv\n\t format can be: 0-Y only, 1-YUV420, 2-YUV422, 3-YUV444\n\t specify '-p' to enable semi-planar mode\n");
+  fprintf(stdout, "Usage: yay [-s <width>x<height>] [-w <width>x<height>] \n\t   [-f format] [-p] filename.yuv\n"
+      "\t specify '-s' if the geometry information in the filename\n"
+      "\t specify '-w' for a window size smaller than frame geometry\n"
+      "\t format can be: 0-Y only, 1-YUV420, 2-YUV422, 3-YUV444\n"
+      "\t specify '-p' to enable semi-planar mode\n");
 }
 
 
@@ -234,29 +243,36 @@ int main(int argc, char *argv[])
     print_usage();
     return 1;
   } else {
-    while((opt = getopt(argc, argv, "f:s:p")) != -1)
-      switch(opt){
+    while ((opt = getopt(argc, argv, "w:f:s:p")) != -1)
+      switch (opt) {
       case 's':
         if (sscanf(optarg, "%dx%d", &width, &height) != 2) {
-          fprintf(stdout, "No geometry information provided by -s parameter.\n");
+          fprintf(stdout,
+              "No geometry information provided by -s parameter.\n");
           return 1;
-	}
-	used_s_opt = 1;
-	break;
+        }
+        used_s_opt = 1;
+        break;
       case 'f':
-	if (sscanf(optarg, "%d", &cfidc) != 1 || (cfidc<0 && cfidc>3)) {
-	  fprintf(stdout, "Invalid format provided by -f parameter.\n");
-	  return 1;
-	}
-	break;
+        if (sscanf(optarg, "%d", &cfidc) != 1 || (cfidc < 0 && cfidc > 3)) {
+          fprintf(stdout, "Invalid format provided by -f parameter.\n");
+          return 1;
+        }
+        break;
       case 'p':
         // Enable semi-planar mode
         sp = 1;
         break;
+      case 'w':
+        if (sscanf(optarg, "%dx%d", &win_width, &win_height) != 2) {
+          fprintf(stdout, "misformed window size information provided by -w parameter.\n");
+          return 1;
+        }
+        break;
       default:
-	print_usage();
-	return 1;
-	break;
+        print_usage();
+        return 1;
+        break;
       }
   }
   argv += optind;
@@ -283,7 +299,13 @@ int main(int argc, char *argv[])
     min_zoom = 2;
   }
   //printf("using x=%d y=%d\n", width, height);
-  
+
+  if (win_width > width) win_width = width;
+  if (win_height > height) win_height = height;
+
+  if (win_width == 0) win_width = width;
+  if (win_height == 0) win_height = height;
+
   // SDL init
   if(SDL_Init(SDL_INIT_VIDEO) < 0){ 
     fprintf(stderr, "Unable to set video mode: %s\n", SDL_GetError());
@@ -298,12 +320,12 @@ int main(int argc, char *argv[])
     }
   
   bpp = info->vfmt->BitsPerPixel;
-  if(info->hw_available)
-    vflags = SDL_HWSURFACE;
-  else	
-    vflags = SDL_SWSURFACE;
-  
-  if( (screen = SDL_SetVideoMode(width*zoom, height*zoom, bpp,
+   if(info->hw_available)
+   	vflags = SDL_HWSURFACE;
+   	else	
+   	vflags = SDL_SWSURFACE;
+
+  if( (screen = SDL_SetVideoMode(win_width*zoom, win_height*zoom, bpp,
 				 vflags)) == 0 ) 
     {       
       fprintf(stderr, "SDL ERROR Video mode set failed: %s\n", SDL_GetError() );
@@ -318,7 +340,7 @@ int main(int argc, char *argv[])
 
   SDL_EnableKeyRepeat(500, 10);
 
-  my_overlay = SDL_CreateYUVOverlay(width, height, SDL_YV12_OVERLAY, screen);
+  my_overlay = SDL_CreateYUVOverlay(win_width, win_height, SDL_YV12_OVERLAY, screen);
   if(!my_overlay){ //Couldn't create overlay?
     fprintf(stderr, "Couldn't create overlay\n"); //Output to stderr and quit
     exit(1);
@@ -410,10 +432,10 @@ int main(int argc, char *argv[])
 	  case SDLK_UP:
 	    {
 	      zoom++;
-	      screen = SDL_SetVideoMode(width*zoom, height*zoom, bpp,
+	      screen = SDL_SetVideoMode(win_width*zoom, win_height*zoom, bpp,
 					vflags); 
-	      video_rect.w = width*zoom;
-	      video_rect.h = height*zoom;
+	      video_rect.w = win_width*zoom;
+	      video_rect.h = win_height*zoom;
 	      SDL_DisplayYUVOverlay(my_overlay, &video_rect);
 	      break;
 	    }
@@ -421,10 +443,10 @@ int main(int argc, char *argv[])
 	    {
 	      if(zoom>min_zoom){
 		zoom--;
-		screen = SDL_SetVideoMode(width*zoom, height*zoom, bpp,
+		screen = SDL_SetVideoMode(win_width*zoom, win_height*zoom, bpp,
 					  vflags); 
-		video_rect.w = width*zoom;
-		video_rect.h = height*zoom;
+		video_rect.w = win_width*zoom;
+		video_rect.h = win_height*zoom;
 		SDL_DisplayYUVOverlay(my_overlay, &video_rect);
 	      }
 	      break;
