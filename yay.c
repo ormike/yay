@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
         tmp_data = malloc(width * height * sizeof(Uint8) / SubSizeC[cfidc] * 2);
     }
 
-  fpointer = fopen(vfilename, "rb"); 
+  fpointer = fopen64(vfilename, "rb");
   if (fpointer == NULL){
     fprintf(stderr, "Error opening %s\n", vfilename);
     return 1;
@@ -420,14 +420,17 @@ int main(int argc, char *argv[])
 	  case SDLK_BACKSPACE:
 	  case SDLK_LEFT:
 	    { 
-	      if(frame>1){
-		frame--;
-		fseek(fpointer, ((frame-1)*height*width*FrameSize2C[cfidc])/2 , SEEK_SET);
-		//if(draw_frame())
-		load_frame();
-		draw_frame();
-	      }
-	      break;
+        if (frame > 1)
+        {
+          off64_t offset;
+          frame--;
+          offset = (frame - 1) * (long long)height * width * FrameSize2C[cfidc] / 2;
+          fseeko64(fpointer, offset, SEEK_SET);
+          //if(draw_frame())
+          load_frame();
+          draw_frame();
+        }
+        break;
 	    }
 	  case SDLK_UP:
 	    {
@@ -455,7 +458,7 @@ int main(int argc, char *argv[])
 	    { 
 	      if(frame>1){
 		frame=1;
-		fseek(fpointer, 0, SEEK_SET);
+		fseeko64(fpointer, 0, SEEK_SET);
 		//if(draw_frame())
 		load_frame();
 		draw_frame();
